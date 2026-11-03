@@ -42,8 +42,8 @@
       <div>
         <label class="block text-xs font-semibold text-slate-500 uppercase mb-1">Mês de Referência</label>
         <select id="selectMes" onchange="carregarDadosPlanilha()" class="w-full p-2.5 bg-blue-50 border border-blue-300 text-blue-900 font-bold rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm">
-          <option value="10-2026" selected>Outubro / 2026</option>
-          <option value="09-2026">Setembro / 2026</option>
+          <option value="OUTUBRO" selected>Outubro / 2026</option>
+          <option value="SETEMBRO">Setembro / 2026</option>
         </select>
       </div>
       <div>
@@ -168,25 +168,35 @@
       statusEl.className = "text-xs px-2.5 py-1 rounded-full bg-amber-800 text-amber-200 flex items-center gap-1 font-medium";
       statusEl.innerHTML = `<i class="ph-bold ph-arrows-clockwise animate-spin"></i> Atualizando...`;
 
-      // Monta URL buscando especificamente o nome da aba (sheet)
       const csvUrl = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(mesSelecionado)}`;
 
       Papa.parse(csvUrl, {
         download: true,
         header: true,
-        skipEmptyLines: true,
+        skipEmptyLines: 'greedy', // Ignora linhas totalmente vazias de forma agressiva
         complete: function(results) {
           if (results.data && results.data.length > 0) {
-            baseDados = results.data.map(item => ({
-              id: item['ID'] || item['id'] || 'N/A',
-              estudante: item['Estudante'] || item['estudante'] || 'Não informado',
-              turma: item['Turma'] || item['turma'] || '',
-              categoria: item['Categoria'] || item['categoria'] || 'Convencional',
-              periodo: item['Período'] || item['Periodo'] || item['periodo'] || 'Manhã',
-              veiculo: (item['Veículo'] || item['Veiculo'] || item['veiculo'] || 'N/A').toUpperCase().trim(),
-              condutor: item['Condutor'] || item['condutor'] || 'N/A',
-              projeto: item['Projeto'] || item['projeto'] || 'Não'
-            }));
+            baseDados = results.data
+              .filter(item => {
+                // Pega qualquer linha que tenha pelo menos ID ou Estudante preenchido
+                const keys = Object.keys(item);
+                const valId = item[keys[0]] || item['ID'] || item['id'];
+                const valNome = item[keys[1]] || item['Estudante'] || item['estudante'];
+                return valId && valNome && valId.toString().trim() !== '';
+              })
+              .map(item => {
+                const keys = Object.keys(item);
+                return {
+                  id: item['ID'] || item['id'] || item[keys[0]] || 'N/A',
+                  estudante: item['Estudante'] || item['estudante'] || item[keys[1]] || 'Não informado',
+                  turma: item['Turma'] || item['turma'] || item[keys[2]] || '',
+                  categoria: item['Categoria'] || item['categoria'] || item[keys[3]] || 'Convencional',
+                  periodo: item['Período'] || item['Periodo'] || item['periodo'] || item[keys[4]] || 'Manhã',
+                  veiculo: (item['Veículo'] || item['Veiculo'] || item['veiculo'] || item[keys[5]] || 'N/A').toUpperCase().trim(),
+                  condutor: item['Condutor'] || item['condutor'] || item[keys[6]] || 'N/A',
+                  projeto: item['Projeto'] || item['projeto'] || item[keys[7]] || 'Não'
+                };
+              });
 
             populaCondutores();
             filtrarDados();
@@ -198,7 +208,7 @@
         error: function(err) {
           console.error("Erro ao carregar dados:", err);
           statusEl.className = "text-xs px-2.5 py-1 rounded-full bg-rose-800 text-rose-200 flex items-center gap-1 font-medium";
-          statusEl.innerHTML = `<i class="ph-bold ph-warning"></i> Aba ${mesSelecionado} não encontrada`;
+          statusEl.innerHTML = `<i class="ph-bold ph-warning"></i> Erro na aba`;
         }
       });
     }
